@@ -13,6 +13,5 @@ tc filter add dev eth2 protocol ip parent 1: pref 1 u32 \
 	match u8 0x05 0xff at 270 \
 	flowid 1:11 action drop
 
-
-#tc qdisc add dev eth2 parent 1:10 handle 10: fq_code1
-#tc qdisc add dev eth2 parent 1:11 handle 11: fq_code1
+#tc -s filter show dev br0
+#it only shows up on br0, not sure why
