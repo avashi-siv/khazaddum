@@ -1,3 +1,5 @@
+"""Class to drop packets by matching on arbitrary bits"""
+
 import logging
 from plumbum import SshMachine, ProcessExecutionError
 
@@ -15,14 +17,36 @@ class PacketDropper():
         self.address = address
         self._machine = SshMachine(address, keyfile, user)
         self._log = logging.getLogger(__name__)
+        self._pref = 0
 
     def remove_qdisc(self, iface: str):
+        """Clear the root qdisc
+
+        This is the qdisc that this module works on.  The qdisc should be
+        cleared every time a new instance of PacketDropper is created,
+        or there will be conflicts with rule priorities.
+        """
         try:
             self.machine['sudo']('tc', 'qdisc', 'del', 'dev', iface, 'root')
         except ProcessExecutionError as err:
             raise CommandFailure(str(err))
 
-    def drop_DHCP(self, dhcp_type: str, mac_addr: str = None, iface: str):
+    def _setup_classes(self):
+        # create an HTB qdisc on given interface
+        self.machine['sudo']('qdisc', 'add', 'dev', iface, 'root',
+                'handle', '1:', 'htb', 'default', '10')
+        # create a superclass to sort traffic 
+        self.machine['sudo']('qdisc', 'add', 'dev', iface, 'root',
+                'handle', '1:', 'htb', 'default', '10')
+        # create two subclasses, one that matches packets on the filter, one for all others
+        for subclassid in '10', '11':
+            # HTB requires a rate since it's technically for rate limiting
+            # I assume here that 2gbit is above any possible traffic, is that reasonable?
+            self.machine['sudo']('class', 'add' 'dev', iface, 'parent',
+                    '1:1', 'classid', subclassid, 'htb', 'rate', '2gbit')
+        self._pref += 1
+
+    def drop_DHCP(self, dhcp_type: str, iface: str, mac_addr: str = None):
         """
         Drop DHCP packets moving across this device.  Only blocks packets on
         their way out of the device, i.e. via the egress qdisc.
@@ -55,23 +79,25 @@ class PacketDropper():
             first_mac_binary, second_mac_binary = f'{0x0:0>32b}', f'{0x0:0>16b}'
             bitmask1, bitmask2 = '0x00000000', '0x0000'
 
-        # create an HTB qdisc on given interface
-        self.machine['sudo']('qdisc', 'add', 'dev', iface, 'root',
-                'handle', '1:', 'htb', 'default', '10')
-        # create a superclass to sort traffic 
-        self.machine['sudo']('qdisc', 'add', 'dev', iface, 'root',
-                'handle', '1:', 'htb', 'default', '10')
-        # create two subclasses, one that matches packets on the filter, one for all others
-        for subclassid in '10', '11':
-            # HTB requires a rate since it's technically for rate limiting
-            # I assume here that 2gbit is above any possible traffic, is that reasonable?
-            self.machine['sudo']('class', 'add' 'dev', iface, 'parent',
-                    '1:1', 'classid', subclassid, 'htb', 'rate', '2gbit')
+        self._setup_classes()
+
         # where the magic happens
         self.machine['sudo']('tc', 'filter', 'add', 'dev', iface,
-                'protocol', 'ip', 'parent', '1:', 'pref', '1', 'u32',
+                'protocol', 'ip', 'parent', '1:', 'pref', self._pref, 'u32',
                 'match', 'ip', 'protocol', '17', '0xff',
                 'match', 'u32', first_mac_binary, bitmask1, 'at', '56',
                 'match', 'u16', second_mac_binary, bitmask2, 'at', '60',
                 'match', 'u8', dhcp_bit, '0xff', 'at', '270',
+                'flowid', '1:11', 'action', 'drop')
+
+    def drop_ARP(self, iface: str):
+        """Drop ARP packets on the given interface
+
+        :param iface: The interface on which to drop outgoing ARP packets
+        """
+        self._setup_classes()
+
+        self.machine['sudo']('tc', 'filter', 'add', 'dev', iface,
+                'protocol', 'ip', 'parent', '1:', 'pref', self._pref, 'u32',
+                'match', 'u16', '0x0000100000000110', '0xffff', 'at', '4'
                 'flowid', '1:11', 'action', 'drop')
