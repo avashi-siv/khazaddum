@@ -1,4 +1,17 @@
-### basic instructions
+# khazaddum 
+Named after [the bridge](https://giphy.com/explore/gandalf) that dropped Gandalf and the Balrog.
+
+The PacketDropper class is capable of dropping these packets:
+
+- DHCP 
+- ARP
+
+Rules created with this script (and tc filter directly) do not persist through reboots.  
+
+Removing a qdisc clears all rules associated with that qdisc.  All rules created with
+this module are applied to the root qdisc.  
+
+##### Outdated shell scripts 
 
 buildBridge.sh creates a bridge on a linux device.  It relies on environment variables `$iface0` and `$iface1`.
 
