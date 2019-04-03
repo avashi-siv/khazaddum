@@ -111,6 +111,7 @@ class PacketDropper():
         """
         self._setup_classes(iface)
 
+        # www.funtoo.org/Traffic_Control
         self._machine['sudo']('tc', 'filter', 'add', 'dev', iface,
                 'protocol', 'ip', 'parent', '1:', 'pref', self._pref, 'u32',
                 'match', 'u16', '0x0806', '0xffff', 'at', '4'
