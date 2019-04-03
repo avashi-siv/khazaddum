@@ -13,8 +13,9 @@ class PacketDropper():
 
     def __init__(self, address: str, keyfile: str, user: str = 'starry'):
         self.address = address
-        self._machine = SshMachine(address, keyfile, user)
+        self._machine = SshMachine(host=address, keyfile=keyfile, user=user)
         self._log = logging.getLogger(__name__)
+        self._log.
         self._pref = 0
 
     def remove_qdisc(self, iface: str):
@@ -33,16 +34,16 @@ class PacketDropper():
 
     def _setup_classes(self, iface: str):
         # create an HTB qdisc on given interface
-        self._machine['sudo']('qdisc', 'add', 'dev', iface, 'root',
+        self._machine['sudo']('tc', 'qdisc', 'add', 'dev', iface, 'root',
                 'handle', '1:', 'htb', 'default', '10')
         # create a superclass to sort traffic
-        self._machine['sudo']('qdisc', 'add', 'dev', iface, 'root',
+        self._machine['sudo']('tc', 'qdisc', 'add', 'dev', iface, 'root',
                 'handle', '1:', 'htb', 'default', '10')
         # create two subclasses, one that matches packets on the filter, one for all others
         for subclassid in '10', '11':
             # HTB requires a rate since it's technically for rate limiting
             # I assume here that 2gbit is above any possible traffic, is that reasonable?
-            self._machine['sudo']('class', 'add' 'dev', iface, 'parent',
+            self._machine['sudo']('tc', 'class', 'add' 'dev', iface, 'parent',
                     '1:1', 'classid', subclassid, 'htb', 'rate', '2gbit')
         self._pref += 1
         self._log.info("Qdisc and classes created")
@@ -112,5 +113,5 @@ class PacketDropper():
 
         self._machine['sudo']('tc', 'filter', 'add', 'dev', iface,
                 'protocol', 'ip', 'parent', '1:', 'pref', self._pref, 'u32',
-                'match', 'u16', '0x0000100000000110', '0xffff', 'at', '4'
+                'match', 'u16', '0x0806', '0xffff', 'at', '4'
                 'flowid', '1:11', 'action', 'drop')
