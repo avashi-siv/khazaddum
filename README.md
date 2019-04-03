@@ -1,5 +1,5 @@
 # khazaddum 
-Named after [the bridge](https://giphy.com/explore/gandalf) that dropped Gandalf and the Balrog.
+Named after [the bridge](//media.giphy.com/media/A6PcmRqkyMOBy/giphy.gif) that dropped Gandalf and the Balrog.
 
 The PacketDropper class is capable of dropping these packets:
 
