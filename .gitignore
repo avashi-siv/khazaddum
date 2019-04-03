@@ -1,0 +1,17 @@
+__pycache__/
+
+build/
+dist/
+*.egg-info/
+
+*.swp
+
+.coverage
+*_cache/
+.tox/
+.cache/
+
+_build/
+modules.rst
+zephyr.rst
+zephyr.debug.rst
